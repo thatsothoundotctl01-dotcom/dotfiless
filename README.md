@@ -10,10 +10,7 @@ Personal configuration for **Neovim**, **tmux**, and **Kitty**. The Neovim setup
 
 ## Screenshots
 
-<p align="center">
-  <img src="./assets/tmux-terminal.png" alt="tmux terminal split into panes" width="49%">
-  <img src="./assets/neovim-file-explorer.png" alt="Neovim file explorer" width="49%">
-</p>
+![tmux terminal screenshot](https://plain-apac-prod-public.komododecks.com/202610/12/UWhGXu3UW9Et6uzhQ9vj/image.png)
 
 ## Requirements
 
