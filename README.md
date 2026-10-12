@@ -8,9 +8,13 @@ Personal configuration for **Neovim**, **tmux**, and **Kitty**. The Neovim setup
 - **tmux**: mouse support, a top status bar, and styled window and pane indicators.
 - **Kitty**: JetBrainsMono Nerd Font, Catppuccin Mocha terminal colors, a bottom tab bar, and shortcuts for tabs, windows, and font sizing.
 
-## Screenshots
+## Tmux
 
 ![tmux terminal screenshot](https://plain-apac-prod-public.komododecks.com/202610/12/UWhGXu3UW9Et6uzhQ9vj/image.png)
+
+## Neovim
+
+![Neovim file explorer screenshot](https://plain-apac-prod-public.komododecks.com/202610/12/uqAB3B5q9U1IAtTRqXfo/image.png)
 
 ## Requirements
 
