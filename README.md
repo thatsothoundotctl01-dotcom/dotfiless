@@ -9,7 +9,10 @@ A personal terminal setup for **Neovim**, **tmux**, and **Kitty**. The Neovim co
 - **Kitty**: JetBrainsMono Nerd Font, Catppuccin Mocha terminal colors, a bottom tab bar, and shortcuts for tabs, windows, and font sizing.
 
 ## Cursor
-[Cursor Animation](https://videotourl.net/v/4b0c2ca7-67c2-459d-8156-89160e3d7235)
+
+<a href="https://videotourl.net/v/4b0c2ca7-67c2-459d-8156-89160e3d7235" target="_blank" rel="noopener noreferrer">
+  <img src="https://cdn.videotourl.net/thumbnails/4b0c2ca7-67c2-459d-8156-89160e3d7235.jpg" alt="Cursor animation" width="960" />
+</a>
 
 ## Tmux
 
