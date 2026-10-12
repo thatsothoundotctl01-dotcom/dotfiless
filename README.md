@@ -10,9 +10,10 @@ Personal configuration for **Neovim**, **tmux**, and **Kitty**. The Neovim setup
 
 ## Screenshots
 
-| tmux terminal | Neovim file explorer |
-| --- | --- |
-| ![tmux terminal split into panes](assets/tmux-terminal.png) | ![Neovim file explorer](assets/neovim-file-explorer.png) |
+<p align="center">
+  <img src="./assets/tmux-terminal.png" alt="tmux terminal split into panes" width="49%">
+  <img src="./assets/neovim-file-explorer.png" alt="Neovim file explorer" width="49%">
+</p>
 
 ## Requirements
 
@@ -85,3 +86,4 @@ To update plugins, run `:PackUpdate` in Neovim. `:PackAdd` and `:PackDel` are al
 - Neovim: `.config/nvim/`
 - Kitty: `.config/kitty/kitty.conf`
 - tmux: `tmux.conf`
+#update 
