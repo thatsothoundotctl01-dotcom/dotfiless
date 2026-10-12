@@ -2,12 +2,6 @@
 
 A personal terminal setup for **Neovim**, **tmux**, and **Kitty**. The Neovim config is written in Lua and uses Neovim's built-in plugin manager.
 
-## What's included
-
-- **Neovim**: Moonfly colorscheme, `mini.nvim` tools (file browser, fuzzy picker, completion, snippets, and more), Tree-sitter highlighting, LSP support, Git integration, and a code runner.
-- **tmux**: mouse support, a top status bar, and styled window and pane indicators.
-- **Kitty**: JetBrainsMono Nerd Font, Catppuccin Mocha terminal colors, a bottom tab bar, and shortcuts for tabs, windows, and font sizing.
-
 ## Cursor
 
 [![Cursor animation](https://cdn.videotourl.net/thumbnails/4b0c2ca7-67c2-459d-8156-89160e3d7235.jpg)](https://videotourl.net/v/4b0c2ca7-67c2-459d-8156-89160e3d7235)
