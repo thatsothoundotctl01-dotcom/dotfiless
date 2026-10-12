@@ -9,18 +9,15 @@ A personal terminal setup for **Neovim**, **tmux**, and **Kitty**. The Neovim co
 - **Kitty**: JetBrainsMono Nerd Font, Catppuccin Mocha terminal colors, a bottom tab bar, and shortcuts for tabs, windows, and font sizing.
 
 ## Cursor
-
-Watch the setup walkthrough here:
-
-[Cursor video tour](https://videotourl.net/v/4b0c2ca7-67c2-459d-8156-89160e3d7235)
+[Cursor Animation](https://videotourl.net/v/4b0c2ca7-67c2-459d-8156-89160e3d7235)
 
 ## Tmux
 
-![tmux terminal screenshot](https://plain-apac-prod-public.komododecks.com/202610/12/UWhGXu3UW9Et6uzhQ9vj/image.png)
+![tmux terminal](https://plain-apac-prod-public.komododecks.com/202610/12/UWhGXu3UW9Et6uzhQ9vj/image.png)
 
 ## Neovim
 
-![Neovim file explorer screenshot](https://plain-apac-prod-public.komododecks.com/202610/12/uqAB3B5q9U1IAtTRqXfo/image.png)
+![Neovim file explorer](https://plain-apac-prod-public.komododecks.com/202610/12/uqAB3B5q9U1IAtTRqXfo/image.png)
 
 ## Requirements
 
