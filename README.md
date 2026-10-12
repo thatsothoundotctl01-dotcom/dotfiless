@@ -10,9 +10,7 @@ A personal terminal setup for **Neovim**, **tmux**, and **Kitty**. The Neovim co
 
 ## Cursor
 
-<a href="https://videotourl.net/v/4b0c2ca7-67c2-459d-8156-89160e3d7235" target="_blank" rel="noopener noreferrer">
-  <img src="https://cdn.videotourl.net/thumbnails/4b0c2ca7-67c2-459d-8156-89160e3d7235.jpg" alt="Cursor animation" width="960" />
-</a>
+[![Cursor animation](https://cdn.videotourl.net/thumbnails/4b0c2ca7-67c2-459d-8156-89160e3d7235.jpg)](https://videotourl.net/v/4b0c2ca7-67c2-459d-8156-89160e3d7235)
 
 ## Tmux
 
