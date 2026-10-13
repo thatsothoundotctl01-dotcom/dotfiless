@@ -13,9 +13,7 @@ A polished personal terminal setup for **Neovim**, **tmux**, and **Kitty**. This
 - Fast file navigation and project search
 - Built-in code execution and diagnostics workflow
 
-## Screenshots
-
-### Cursor demo
+### Cursor Animation
 
 [![Cursor animation](https://cdn.videotourl.net/thumbnails/4b0c2ca7-67c2-459d-8156-89160e3d7235.jpg)](https://videotourl.net/v/4b0c2ca7-67c2-459d-8156-89160e3d7235)
 
@@ -35,14 +33,6 @@ Before installing, make sure you have:
 - `tree-sitter` CLI for installing language parsers
 - `/usr/bin/zsh` configured as tmux's default shell
 
-Neovim LSP support is configured for Lua, Markdown, Go, and Rust. Install the language servers you need with Mason:
-
-```vim
-:MasonInstall lua-language-server marksman gopls rust-analyzer
-```
-
-The code runner also expects the relevant toolchains to be on your `PATH` (for example Python, Node.js, Go, Rust, GCC, or Java), depending on the file types you want to execute. Clipboard integration also requires a working Neovim clipboard provider.
-
 ## Quick install
 
 Install Neovim 0.12.2 and place it on your `PATH`:
@@ -60,7 +50,6 @@ After that, open Neovim and install the plugin set:
 ```vim
 :PackUpdate
 ```
-
 
 ## Kitty shortcuts
 
