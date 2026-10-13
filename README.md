@@ -1,73 +1,66 @@
 # Dotfiless
 
-A personal terminal setup for **Neovim**, **tmux**, and **Kitty**. The Neovim config is written in Lua and uses Neovim's built-in plugin manager.
+A polished personal terminal setup for **Neovim**, **tmux**, and **Kitty**. This config is tuned for a fast, distraction-free workflow with Lua-based Neovim configuration and built-in plugin management.
 
-## Cursor
+![Neovim](https://plain-apac-prod-public.komododecks.com/202610/12/uqAB3B5q9U1IAtTRqXfo/image.png)
+
+## Highlights
+
+- Lua-first Neovim configuration
+- Modern tmux workflow with a zsh default shell
+- Kitty terminal setup with Nerd Font styling
+- LSP support for Lua, Markdown, Go, and Rust
+- Fast file navigation and project search
+- Built-in code execution and diagnostics workflow
+
+## Screenshots
+
+### Cursor demo
 
 [![Cursor animation](https://cdn.videotourl.net/thumbnails/4b0c2ca7-67c2-459d-8156-89160e3d7235.jpg)](https://videotourl.net/v/4b0c2ca7-67c2-459d-8156-89160e3d7235)
 
-## Tmux
+### tmux workspace
 
 ![tmux terminal](https://plain-apac-prod-public.komododecks.com/202610/12/UWhGXu3UW9Et6uzhQ9vj/image.png)
 
-## Neovim
-
-![Neovim file explorer](https://plain-apac-prod-public.komododecks.com/202610/12/uqAB3B5q9U1IAtTRqXfo/image.png)
-
 ## Requirements
 
+Before installing, make sure you have:
+
 - Neovim **0.12 or newer** (`vim.pack` is used to manage plugins)
-- Git, for downloading Neovim plugins
+- Git for fetching plugins
 - tmux
 - Kitty (optional if you use another terminal)
-- JetBrainsMono Nerd Font installed on your system for the configured Kitty font
-- The `tree-sitter` CLI for installing Neovim parsers
-- `/usr/bin/zsh`, as configured as tmux's default shell
+- JetBrainsMono Nerd Font installed
+- `tree-sitter` CLI for installing language parsers
+- `/usr/bin/zsh` configured as tmux's default shell
 
-Neovim language-server support is configured for Lua, Markdown, Go, and Rust. Install the language servers you need with Mason from Neovim, for example:
+Neovim LSP support is configured for Lua, Markdown, Go, and Rust. Install the language servers you need with Mason:
 
 ```vim
 :MasonInstall lua-language-server marksman gopls rust-analyzer
 ```
 
-The code runner also needs the relevant language toolchains available on your `PATH` (such as Python, Node.js, Go, Rust, GCC, or Java) for the file types you want to run. System clipboard integration requires a working Neovim clipboard provider.
+The code runner also expects the relevant toolchains to be on your `PATH` (for example Python, Node.js, Go, Rust, GCC, or Java), depending on the file types you want to execute. Clipboard integration also requires a working Neovim clipboard provider.
 
-## Install
+## Quick install
 
-Clone this repository, then run these commands from its root. Back up or move any existing configuration files at the target paths first.
+Install Neovim 0.12.2 and place it on your `PATH`:
 
-```sh
-mkdir -p "$HOME/.config"
-ln -s "$PWD/.config/nvim" "$HOME/.config/nvim"
-mkdir -p "$HOME/.config/kitty"
-ln -s "$PWD/.config/kitty/kitty.conf" "$HOME/.config/kitty/kitty.conf"
-ln -s "$PWD/tmux.conf" "$HOME/.tmux.conf"
+```bash
+curl -LO https://github.com/neovim/neovim/releases/download/v0.12.2/nvim-linux-x86_64.tar.gz && \
+  sudo rm -rf /opt/nvim-linux-x86_64 && \
+  sudo tar -C /opt -xzf nvim-linux-x86_64.tar.gz && \
+  sudo ln -sf /opt/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim && \
+  nvim --version | head -
 ```
 
-Start Neovim with `nvim`. Its first launch downloads the configured plugins. Parsers listed in the Tree-sitter configuration are installed through the Neovim plugin setup.
+After that, open Neovim and install the plugin set:
 
-## Neovim shortcuts
+```vim
+:PackUpdate
+```
 
-The leader key is **Space**.
-
-| Shortcut | Action |
-| --- | --- |
-| `-` | Open the file explorer |
-| `<Space>-` | Open the explorer at the current file |
-| `<Space>pf` | Find files |
-| `<Space>ps` | Search for the word under the cursor |
-| `<Space>vh` | Search Neovim help |
-| `<Space>xx` | Browse diagnostics |
-| `<Space>pk` | Search keymaps |
-| `gd` | Go to definition |
-| `<Space>f` | Format the current buffer |
-| `<Space>e` | Show diagnostics for the current line |
-| `F6` / `F7` | Run the current file / close the runner |
-| `<Space>gg` | Open Fugitive in a new tab |
-| `<Space>gd` | Open a Git diff split |
-| `<Space>u` | Open the undo tree |
-
-To update plugins, run `:PackUpdate` in Neovim. `:PackAdd` and `:PackDel` are also available for adding and removing plugins.
 
 ## Kitty shortcuts
 
@@ -85,4 +78,6 @@ To update plugins, run `:PackUpdate` in Neovim. `:PackAdd` and `:PackDel` are al
 - Neovim: `.config/nvim/`
 - Kitty: `.config/kitty/kitty.conf`
 - tmux: `tmux.conf`
+
+
 
