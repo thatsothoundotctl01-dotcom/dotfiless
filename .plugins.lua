@@ -1,6 +1,7 @@
 -- ~/.config/nvim/init.lua
 -- Developer-focused single-file config for Neovim 0.12+
 -- Goal: write code fast. Leader = <Space>. Press <Space> and wait for key hints.
+-- Theme: VS Code Dark+ look (vscode.nvim) + blue VS Code statusline.
 
 local ok_ui2, ui2 = pcall(require, "vim._core.ui2")
 if ok_ui2 then ui2.enable({}) end
@@ -10,7 +11,8 @@ if ok_ui2 then ui2.enable({}) end
 ------------------------------------------------------------
 vim.g.mapleader = " "
 vim.g.maplocalleader = " "
-vim.g.netrw_banner = 0
+vim.g.loaded_netrw = 1
+vim.g.loaded_netrwPlugin = 1
 
 local o = vim.opt
 o.termguicolors = true
@@ -212,10 +214,14 @@ vim.pack.add({
     "https://github.com/mason-org/mason.nvim",
     "https://github.com/tpope/vim-fugitive",
     "https://github.com/CRAG666/code_runner.nvim",
+    "https://github.com/Mofiqul/vscode.nvim",     -- VS Code Dark+ colorscheme
+    "https://github.com/windwp/nvim-ts-autotag",  -- auto close/rename HTML & JSX tags
+    "https://github.com/nvim-tree/nvim-tree.lua", -- VS Code style sidebar explorer
+    "https://github.com/okuuva/auto-save.nvim",   -- auto-save plugin
 })
 
 
----- code_runner (F6 = run current file, F7 = close output) ----
+---- code_runner (F6 = run current file inside nvim, F7 = close output) ----
 require("code_runner").setup({
     mode = "term",
     focus = true,
@@ -250,6 +256,129 @@ map("n", "<F6>", function()
 end, { desc = "Run current file" })
 map("n", "<F7>", "<cmd>RunClose<cr>", { desc = "Close code runner window" })
 
+------------------------------------------------------------
+-- Auto-save + auto-run in the tmux right pane
+------------------------------------------------------------
+-- Auto-save plugin (okuuva/auto-save.nvim)
+--   saves 1s after you stop typing / leave insert mode, immediately on buffer or focus change
+require("auto-save").setup({
+    enabled = true,
+    trigger_events = {
+        immediate_save = { "BufLeave", "FocusLost" },
+        defer_save = { "InsertLeave", "TextChanged" },
+        cancel_deferred_save = { "InsertEnter" },
+    },
+    -- only real, editable files (skips sidebar, pickers, terminals, help ...)
+    condition = function(buf)
+        local b = vim.bo[buf]
+        return b.modifiable and b.buftype == "" and vim.api.nvim_buf_get_name(buf) ~= ""
+            and b.filetype ~= "NvimTree" and b.filetype ~= "minifiles"
+    end,
+    debounce_delay = 1000, -- ms; raise it if auto-run fires too often
+})
+
+-- skip LSP format-on-save during autosaves (it moves your code while you type)
+local autosave_prev_format
+vim.api.nvim_create_autocmd("User", {
+    group = augroup,
+    pattern = "AutoSaveWritePre",
+    callback = function()
+        autosave_prev_format = vim.g.autoformat
+        vim.g.autoformat = false
+    end,
+})
+vim.api.nvim_create_autocmd("User", {
+    group = augroup,
+    pattern = "AutoSaveWritePost",
+    callback = function()
+        if autosave_prev_format ~= nil then vim.g.autoformat = autosave_prev_format end
+    end,
+})
+
+map("n", "<leader>ta", "<cmd>ASToggle<cr>", { desc = "Toggle auto-save" })
+
+-- Run command per filetype. Placeholders: {file} {dir} {name} {bin}
+local run_cmds = {
+    c          = "gcc {file} -o {bin} && {bin}",
+    cpp        = "g++ -std=c++17 {file} -o {bin} && {bin}",
+    python     = "python3 -u {file}",
+    javascript = "node {file}",
+    typescript = "npx tsx {file}",
+    lua        = "nvim -l {file}",
+    sh         = "bash {file}",
+    bash       = "bash {file}",
+    zsh        = "zsh {file}",
+    php        = "php {file}",
+    ruby       = "ruby {file}",
+    perl       = "perl {file}",
+    go         = "go run {file}",
+    rust       = "rustc {file} -o {bin} && {bin}",
+    java       = "javac {file} && java -cp {dir} {name}",
+    kotlin     = "kotlinc {file} -include-runtime -d {bin}.jar && java -jar {bin}.jar",
+    zig        = "zig run {file}",
+    swift      = "swiftc {file} -o {bin} && {bin}",
+    dart       = "dart run {file}",
+    r          = "Rscript {file}",
+    haskell    = "runghc {file}",
+    cs         = "mcs {file} -out:{bin}.exe && mono {bin}.exe",
+    scala      = "scala {file}",
+    elixir     = "elixir {file}",
+    julia      = "julia {file}",
+    nim        = "nim compile --run -o:{bin} {file}",
+}
+
+-- Which tmux pane gets the command. Default: the pane to the right of nvim.
+-- Override with  :let g:run_pane = "1"  (any tmux target, see `tmux display-panes`)
+local function tmux_target() return vim.g.run_pane or "{right-of}" end
+
+local function send_to_tmux(buf)
+    if vim.env.TMUX == nil then
+        return vim.notify("Not inside tmux", vim.log.levels.WARN)
+    end
+    local ft = vim.bo[buf].filetype
+    local tpl = run_cmds[ft]
+    if not tpl then
+        return vim.notify("No run command for filetype: " .. ft, vim.log.levels.WARN)
+    end
+    local path = vim.api.nvim_buf_get_name(buf)
+    local name = vim.fn.fnamemodify(path, ":t:r")
+    local esc = vim.fn.shellescape
+    local cmd = tpl
+        :gsub("{file}", function() return esc(path) end)
+        :gsub("{dir}", function() return esc(vim.fn.fnamemodify(path, ":h")) end)
+        :gsub("{name}", function() return name end)
+        :gsub("{bin}", function() return esc("/tmp/" .. name) end)
+    cmd = "clear; cd " .. esc(vim.fn.fnamemodify(path, ":h")) .. " && " .. cmd
+
+    local t = tmux_target()
+    vim.system({
+        "tmux",
+        "send-keys", "-t", t, "C-c", ";",     -- stop the previous run
+        "send-keys", "-t", t, "-l", cmd, ";", -- type the command
+        "send-keys", "-t", t, "Enter",
+    })
+end
+
+-- Auto-run after every save (toggle with <leader>tr)
+vim.g.autorun = true
+vim.api.nvim_create_autocmd("BufWritePost", {
+    group = augroup,
+    desc = "Compile/run in tmux right pane",
+    callback = function(args)
+        if vim.g.autorun and vim.bo[args.buf].buftype == "" then
+            send_to_tmux(args.buf)
+        end
+    end,
+})
+map("n", "<leader>tr", function()
+    vim.g.autorun = not vim.g.autorun
+    vim.notify("Auto-run " .. (vim.g.autorun and "ON" or "OFF"))
+end, { desc = "Toggle auto-run on save" })
+
+-- Manual run in the tmux pane
+map("n", "<F8>", function() send_to_tmux(vim.api.nvim_get_current_buf()) end,
+    { desc = "Run in tmux right pane" })
+
 ---- mini.icons (file icons everywhere) ----
 local MiniIcons = require("mini.icons")
 MiniIcons.setup()
@@ -271,16 +400,83 @@ map("n", "<leader>-", function()
     MiniFiles.reveal_cwd()
 end, { desc = "Open explorer at current file" })
 
--- F5 to open project/file folder view using mini.files
-map("n", "<F5>", function()
-    local current_file = vim.api.nvim_buf_get_name(0)
-    if current_file == "" then
-        MiniFiles.open(vim.uv.cwd(), false)
-    else
-        MiniFiles.open(current_file, false)
-        MiniFiles.reveal_cwd()
+---- nvim-tree: VS Code style sidebar ----
+-- F5 = toggle sidebar, <leader>E = reveal current file, `-` = mini.files popup (unchanged)
+local function nvimtree_on_attach(bufnr)
+    local api = require("nvim-tree.api")
+    api.config.mappings.default_on_attach(bufnr)
+    local function o(desc)
+        return { desc = "nvim-tree: " .. desc, buffer = bufnr, noremap = true, silent = true, nowait = true }
     end
-end, { desc = "Open project folder view" })
+    pcall(vim.keymap.del, "n", "<C-k>", { buffer = bufnr }) -- keep <C-k> window navigation
+    map("n", "l", api.node.open.edit, o("Open"))
+    map("n", "<CR>", api.node.open.edit, o("Open"))
+    map("n", "h", api.node.navigate.parent_close, o("Close folder"))
+    map("n", "v", api.node.open.vertical, o("Open in vertical split"))
+    map("n", "q", api.tree.close, o("Close sidebar"))
+end
+
+require("nvim-tree").setup({
+    on_attach = nvimtree_on_attach,
+    hijack_cursor = true,
+    sync_root_with_cwd = true,
+    update_focused_file = { enable = true }, -- follow the file you are editing
+    view = { width = 32, side = "left", signcolumn = "yes" },
+    renderer = {
+        group_empty = true,
+        highlight_git = "name",
+        indent_width = 2,
+        root_folder_label = function(path) return vim.fn.fnamemodify(path, ":t"):upper() end,
+        indent_markers = {
+            enable = true,
+            icons = { corner = "└", edge = "│", item = "│", bottom = "─", none = " " },
+        },
+        icons = {
+            git_placement = "after",
+            modified_placement = "after",
+            show = { file = true, folder = false, folder_arrow = true, git = true, modified = true },
+            glyphs = {
+                modified = "●",
+                folder = {
+                    arrow_closed = vim.fn.nr2char(0xf054), -- chevron right
+                    arrow_open = vim.fn.nr2char(0xf078),   -- chevron down
+                },
+                git = {
+                    unstaged = "M",
+                    staged = "A",
+                    unmerged = "!",
+                    renamed = "R",
+                    untracked = "U",
+                    deleted = "D",
+                    ignored = "◌",
+                },
+            },
+        },
+    },
+    diagnostics = {
+        enable = true,
+        show_on_dirs = false,
+        icons = { hint = "●", info = "●", warning = "●", error = "●" },
+    },
+    git = { enable = true, ignore = false },
+    modified = { enable = true },
+    filters = { dotfiles = false },
+    actions = { open_file = { quit_on_open = false, window_picker = { enable = false } } },
+})
+
+map("n", "<F5>", "<cmd>NvimTreeToggle<cr>", { desc = "Toggle sidebar explorer" })
+map("n", "<leader>E", "<cmd>NvimTreeFindFile<cr>", { desc = "Reveal current file in sidebar" })
+
+-- close nvim when the sidebar is the last window left
+vim.api.nvim_create_autocmd("BufEnter", {
+    group = augroup,
+    nested = true,
+    callback = function()
+        if #vim.api.nvim_list_wins() == 1 and vim.bo.filetype == "NvimTree" then
+            vim.cmd("quit")
+        end
+    end,
+})
 
 ---- mini.pairs (auto-close braces, brackets, quotes) ----
 require("mini.pairs").setup()
@@ -386,6 +582,12 @@ map("n", "<leader>gg", "<cmd>tabnew | Git | only<cr>", { desc = "Fugitive full p
 map("n", "<leader>gd", "<cmd>Gvdiffsplit<CR>", { desc = "Git diff split" })
 map("n", "<leader>gb", "<cmd>Git blame<cr>", { desc = "Git blame" })
 map("n", "<leader>go", function() MiniDiff.toggle_overlay(0) end, { desc = "Toggle diff overlay" })
+
+---- mini.statusline (VS Code style bottom bar) ----
+require("mini.statusline").setup({ use_icons = true })
+
+---- nvim-ts-autotag (needs treesitter html/tsx parsers) ----
+require("nvim-ts-autotag").setup()
 
 ---- mini.clue (shows available keys after you press <Space>, g, z, [, ] ...) ----
 local miniclue = require("mini.clue")
@@ -528,197 +730,72 @@ end
 vim.lsp.enable(enabled)
 
 ------------------------------------------------------------
--- Colorscheme "kitty": uses the same colors as ~/.config/kitty/kitty.conf
--- (dark gray #262626 + Catppuccin Mocha accents), no italics.
--- transparent = true  -> nvim shows Kitty's own background, so they always match.
+-- Colorscheme: VS Code Dark+ (vscode.nvim)
+-- Transparent by default. Toggle with <leader>tT.
+-- Blur itself comes from the TERMINAL (kitty/alacritty opacity + blur), not from nvim.
+-- nvim only makes its own background transparent and lets popups/floats see through (winblend).
 ------------------------------------------------------------
 local transparent = true
 
-local function apply_theme()
+-- Extra highlights for mini.nvim + VS Code statusline (re-applied after every :colorscheme)
+local function apply_extras()
     local c = {
-        bg      = "#262626", -- kitty background
-        bg_alt  = "#2e2e2e", -- floats / popup menu
-        line    = "#2d2d2d", -- cursor line
-        sel     = "#4a4a4a", -- kitty selection_background
-        fg      = "#d4d4d4", -- kitty foreground
-        white   = "#BAC2DE", -- color7
-        gray    = "#A6ADC8", -- color15
-        comment = "#6c7086",
-        faint   = "#3a3a3a",
-        red     = "#F38BA8", -- color1
-        green   = "#A6E3A1", -- color2
-        yellow  = "#F9E2AF", -- color3
-        blue    = "#89B4FA", -- color4
-        magenta = "#F5C2E7", -- color5
-        cyan    = "#94E2D5", -- color6
-        orange  = "#FAB387", -- numbers (Catppuccin peach)
+        bg_alt = "#252526",
+        sel = "#264F78",
+        line = "#2A2D2E",
+        faint = "#404040",
+        fg = "#D4D4D4",
+        comment = "#6A9955",
+        gray = "#858585",
+        red = "#F44747",
+        green = "#6A9955",
+        yellow = "#DCDCAA",
+        blue = "#569CD6",
+        cyan = "#4EC9B0",
+        orange = "#CE9178",
+        purple = "#C586C0",
+        vsblue = "#007ACC",
     }
-    local bg = transparent and "NONE" or c.bg
-
-    vim.o.termguicolors = true
-    vim.o.background = "dark"
-    vim.g.colors_name = "kitty"
-
-    local function hl(name, spec)
-        spec.italic = false
-        vim.api.nvim_set_hl(0, name, spec)
-    end
+    local function hl(name, spec) vim.api.nvim_set_hl(0, name, spec) end
     local function link(name, to) vim.api.nvim_set_hl(0, name, { link = to }) end
 
-    -- Base UI
-    hl("Normal", { fg = c.fg, bg = bg })
-    hl("NormalNC", { fg = c.fg, bg = bg })
+    -- backgrounds that go transparent (so the terminal blur shows through)
+    local side_bg = transparent and "NONE" or "#252526"
+    local tab_bg = transparent and "NONE" or "#2D2D2D"
+    local tab_cur = transparent and "#2F2F2F" or "#1F1F1F"
+
     hl("NormalFloat", { fg = c.fg, bg = c.bg_alt })
-    hl("FloatBorder", { fg = c.sel, bg = c.bg_alt })
-    hl("FloatTitle", { fg = c.blue, bg = c.bg_alt, bold = true })
-    hl("Cursor", { fg = c.bg, bg = c.fg })
-    link("lCursor", "Cursor")
-    hl("CursorLine", { bg = c.line })
-    hl("CursorColumn", { bg = c.line })
-    hl("LineNr", { fg = c.comment, bg = bg })
-    hl("CursorLineNr", { fg = c.blue, bg = bg, bold = true })
-    hl("SignColumn", { bg = bg })
-    hl("FoldColumn", { fg = c.comment, bg = bg })
-    hl("EndOfBuffer", { fg = c.bg, bg = bg })
-    hl("NonText", { fg = c.faint })
-    hl("Whitespace", { fg = c.faint })
-    hl("WinSeparator", { fg = c.faint, bg = bg })
-    hl("VertSplit", { fg = c.faint, bg = bg })
-    hl("ColorColumn", { bg = c.line })
-    hl("Visual", { bg = c.sel })
-    hl("Search", { fg = c.bg, bg = c.yellow })
-    hl("CurSearch", { fg = c.bg, bg = c.orange })
-    hl("IncSearch", { fg = c.bg, bg = c.orange })
-    hl("MatchParen", { fg = c.orange, bg = c.sel, bold = true })
-    hl("Directory", { fg = c.blue, bold = true })
-    hl("Title", { fg = c.blue, bold = true })
-    hl("Folded", { fg = c.comment, bg = c.line })
-    hl("ModeMsg", { fg = c.fg })
-    hl("MoreMsg", { fg = c.green })
-    hl("Question", { fg = c.green })
-    hl("ErrorMsg", { fg = c.red })
-    hl("WarningMsg", { fg = c.yellow })
-
-    -- Status / tab / popup menu (same grays as the kitty tab bar)
-    hl("StatusLine", { fg = c.fg, bg = "#333333" })
-    hl("StatusLineNC", { fg = c.comment, bg = "#1c1c1c" })
-    hl("TabLine", { fg = "#a0a0a0", bg = "#333333" })
-    hl("TabLineSel", { fg = "#ffffff", bg = c.sel, bold = true })
-    hl("TabLineFill", { bg = "#1c1c1c" })
-    hl("WinBar", { fg = c.fg, bg = bg })
-    hl("WinBarNC", { fg = c.comment, bg = bg })
+    hl("FloatBorder", { fg = c.faint, bg = c.bg_alt })
     hl("Pmenu", { fg = c.fg, bg = c.bg_alt })
-    hl("PmenuSel", { fg = c.fg, bg = c.sel })
-    hl("PmenuSbar", { bg = c.bg_alt })
-    hl("PmenuThumb", { bg = c.sel })
-    hl("WildMenu", { fg = c.fg, bg = c.sel })
+    hl("PmenuSel", { fg = "#FFFFFF", bg = c.sel })
+    hl("CursorLine", { bg = c.line })
+    hl("Visual", { bg = c.sel })
+    hl("WinSeparator", { fg = c.faint })
 
-    -- Syntax (classic groups)
-    hl("Comment", { fg = c.comment })
-    hl("Constant", { fg = c.orange })
-    hl("String", { fg = c.green })
-    hl("Character", { fg = c.green })
-    hl("Number", { fg = c.orange })
-    hl("Float", { fg = c.orange })
-    hl("Boolean", { fg = c.orange })
-    hl("Identifier", { fg = c.fg })
-    hl("Function", { fg = c.blue })
-    hl("Statement", { fg = c.magenta })
-    hl("Conditional", { fg = c.magenta })
-    hl("Repeat", { fg = c.magenta })
-    hl("Label", { fg = c.magenta })
-    hl("Operator", { fg = c.cyan })
-    hl("Keyword", { fg = c.magenta })
-    hl("Exception", { fg = c.magenta })
-    hl("PreProc", { fg = c.cyan })
-    hl("Include", { fg = c.magenta })
-    hl("Define", { fg = c.magenta })
-    hl("Macro", { fg = c.cyan })
-    hl("Type", { fg = c.yellow })
-    hl("StorageClass", { fg = c.magenta })
-    hl("Structure", { fg = c.yellow })
-    hl("Typedef", { fg = c.yellow })
-    hl("Special", { fg = c.cyan })
-    hl("SpecialChar", { fg = c.cyan })
-    hl("Delimiter", { fg = c.gray })
-    hl("SpecialComment", { fg = c.comment })
-    hl("Todo", { fg = c.bg, bg = c.yellow, bold = true })
-    hl("Underlined", { fg = c.blue, underline = true })
-    hl("Error", { fg = c.red })
+    -- statusline: classic VS Code blue bar
+    hl("StatusLine", { fg = "#FFFFFF", bg = c.vsblue })
+    hl("StatusLineNC", { fg = c.gray, bg = "#333333" })
+    hl("MiniStatuslineModeNormal", { fg = "#FFFFFF", bg = "#005F9E", bold = true })
+    hl("MiniStatuslineModeInsert", { fg = "#FFFFFF", bg = "#16825D", bold = true })
+    hl("MiniStatuslineModeVisual", { fg = "#FFFFFF", bg = "#8A4BA8", bold = true })
+    hl("MiniStatuslineModeReplace", { fg = "#FFFFFF", bg = "#C72E2E", bold = true })
+    hl("MiniStatuslineModeCommand", { fg = "#FFFFFF", bg = "#B07F00", bold = true })
+    hl("MiniStatuslineModeOther", { fg = "#FFFFFF", bg = "#555555", bold = true })
+    hl("MiniStatuslineDevinfo", { fg = "#FFFFFF", bg = c.vsblue })
+    hl("MiniStatuslineFilename", { fg = "#FFFFFF", bg = c.vsblue })
+    hl("MiniStatuslineFileinfo", { fg = "#FFFFFF", bg = c.vsblue })
+    hl("MiniStatuslineInactive", { fg = c.gray, bg = "#333333" })
 
-    -- Treesitter
-    hl("@comment", { fg = c.comment })
-    hl("@keyword", { fg = c.magenta })
-    hl("@keyword.function", { fg = c.magenta })
-    hl("@keyword.return", { fg = c.magenta })
-    hl("@keyword.operator", { fg = c.magenta })
-    hl("@keyword.import", { fg = c.magenta })
-    hl("@keyword.modifier", { fg = c.magenta })
-    hl("@keyword.type", { fg = c.magenta })
-    hl("@conditional", { fg = c.magenta })
-    hl("@repeat", { fg = c.magenta })
-    hl("@function", { fg = c.blue })
-    hl("@function.call", { fg = c.blue })
-    hl("@function.method", { fg = c.blue })
-    hl("@function.method.call", { fg = c.blue })
-    hl("@function.builtin", { fg = c.cyan })
-    hl("@variable", { fg = c.fg })
-    hl("@variable.builtin", { fg = c.red })
-    hl("@variable.parameter", { fg = c.fg })
-    hl("@variable.member", { fg = c.white })
-    hl("@property", { fg = c.white })
-    hl("@field", { fg = c.white })
-    hl("@parameter", { fg = c.fg })
-    hl("@constant", { fg = c.orange })
-    hl("@constant.builtin", { fg = c.orange })
-    hl("@number", { fg = c.orange })
-    hl("@number.float", { fg = c.orange })
-    hl("@boolean", { fg = c.orange })
-    hl("@string", { fg = c.green })
-    hl("@string.escape", { fg = c.cyan })
-    hl("@character", { fg = c.green })
-    hl("@type", { fg = c.yellow })
-    hl("@type.builtin", { fg = c.yellow })
-    hl("@type.definition", { fg = c.yellow })
-    hl("@module", { fg = c.yellow })
-    hl("@attribute", { fg = c.yellow })
-    hl("@label", { fg = c.magenta })
-    hl("@operator", { fg = c.cyan })
-    hl("@punctuation", { fg = c.gray })
-    hl("@punctuation.bracket", { fg = c.gray })
-    hl("@punctuation.delimiter", { fg = c.gray })
-    hl("@constructor", { fg = c.yellow })
-    hl("@tag", { fg = c.blue })
-    hl("@tag.attribute", { fg = c.yellow })
-    hl("@tag.delimiter", { fg = c.gray })
-    hl("@markup.heading", { fg = c.blue, bold = true })
-    hl("@markup.link.url", { fg = c.blue, underline = true })
-    hl("@markup.raw", { fg = c.green })
-    hl("@markup.strong", { bold = true })
-    hl("@markup.italic", { fg = c.fg })
+    -- tabline: VS Code editor tabs
+    hl("MiniTabLineCurrent", { fg = "#FFFFFF", bg = tab_cur, bold = true })
+    hl("MiniTabLineVisible", { fg = c.gray, bg = tab_bg })
+    hl("MiniTabLineHidden", { fg = c.gray, bg = tab_bg })
+    hl("MiniTabLineModifiedCurrent", { fg = c.yellow, bg = tab_cur, bold = true })
+    hl("MiniTabLineModifiedVisible", { fg = c.yellow, bg = tab_bg })
+    hl("MiniTabLineModifiedHidden", { fg = c.yellow, bg = tab_bg })
+    hl("MiniTabLineFill", { bg = side_bg })
 
-    -- Diagnostics (hidden by default; styled for the float / picker / toggle)
-    hl("DiagnosticError", { fg = c.red })
-    hl("DiagnosticWarn", { fg = c.yellow })
-    hl("DiagnosticInfo", { fg = c.blue })
-    hl("DiagnosticHint", { fg = c.cyan })
-    hl("DiagnosticOk", { fg = c.green })
-    hl("DiagnosticUnderlineError", { undercurl = true, sp = c.red })
-    hl("DiagnosticUnderlineWarn", { undercurl = true, sp = c.yellow })
-
-    -- Diff / git
-    hl("DiffAdd", { bg = "#2f3d2f" })
-    hl("DiffChange", { bg = "#3a3626" })
-    hl("DiffDelete", { fg = c.red, bg = "#3d2a2e" })
-    hl("DiffText", { bg = "#4a4328" })
-    hl("Added", { fg = c.green })
-    hl("Changed", { fg = c.yellow })
-    hl("Removed", { fg = c.red })
-    hl("MiniDiffSignAdd", { fg = c.green })
-    hl("MiniDiffSignChange", { fg = c.yellow })
-    hl("MiniDiffSignDelete", { fg = c.red })
-
-    -- mini.nvim
+    -- mini.nvim widgets
     link("MiniFilesNormal", "NormalFloat")
     link("MiniFilesBorder", "FloatBorder")
     hl("MiniFilesCursorLine", { bg = c.sel })
@@ -726,29 +803,79 @@ local function apply_theme()
     link("MiniPickNormal", "NormalFloat")
     link("MiniPickBorder", "FloatBorder")
     hl("MiniPickMatchCurrent", { bg = c.sel })
-    hl("MiniPickMatchRanges", { fg = c.magenta, bold = true })
+    hl("MiniPickMatchRanges", { fg = c.yellow, bold = true })
     link("MiniNotifyNormal", "NormalFloat")
     link("MiniNotifyBorder", "FloatBorder")
     hl("MiniCompletionActiveParameter", { underline = true })
-    hl("MiniTabLineCurrent", { fg = "#ffffff", bg = c.sel, bold = true })
-    hl("MiniTabLineVisible", { fg = "#a0a0a0", bg = "#333333" })
-    hl("MiniTabLineHidden", { fg = c.comment, bg = "#1c1c1c" })
-    hl("MiniTabLineModifiedCurrent", { fg = c.yellow, bg = c.sel, bold = true })
-    hl("MiniTabLineModifiedVisible", { fg = c.yellow, bg = "#333333" })
-    hl("MiniTabLineModifiedHidden", { fg = c.yellow, bg = "#1c1c1c" })
-    hl("MiniTabLineFill", { bg = "#1c1c1c" })
-    hl("MiniIndentscopeSymbol", { fg = c.faint })
-    hl("MiniCursorword", { underline = true })
-    hl("MiniCursorwordCurrent", { underline = true })
-    hl("MiniTrailspace", { bg = "NONE", fg = "NONE" }) -- no pink trailing-space blocks
-    hl("MiniHipatternsFixme", { fg = c.bg, bg = c.red, bold = true })
-    hl("MiniHipatternsHack", { fg = c.bg, bg = c.yellow, bold = true })
-    hl("MiniHipatternsTodo", { fg = c.bg, bg = c.blue, bold = true })
-    hl("MiniHipatternsNote", { fg = c.bg, bg = c.green, bold = true })
+    hl("MiniIndentscopeSymbol", { fg = "#707070" })
+    hl("MiniCursorword", { bg = "#343A40" })
+    hl("MiniCursorwordCurrent", { bg = "#343A40" })
+    hl("MiniTrailspace", { bg = "NONE", fg = "NONE" })
+
+    -- sidebar explorer (VS Code: #252526 background, #37373D selection)
+    hl("NvimTreeNormal", { fg = "#CCCCCC", bg = side_bg })
+    hl("NvimTreeNormalNC", { fg = "#CCCCCC", bg = side_bg })
+    hl("NvimTreeEndOfBuffer", { fg = side_bg, bg = side_bg })
+    hl("NvimTreeWinSeparator", { fg = "#404040", bg = side_bg })
+    hl("NvimTreeCursorLine", { bg = "#37373D" })
+    hl("NvimTreeRootFolder", { fg = "#CCCCCC", bold = true })
+    hl("NvimTreeFolderName", { fg = "#CCCCCC" })
+    hl("NvimTreeOpenedFolderName", { fg = "#CCCCCC" })
+    hl("NvimTreeEmptyFolderName", { fg = "#CCCCCC" })
+    hl("NvimTreeFolderArrowClosed", { fg = "#C5C5C5" })
+    hl("NvimTreeFolderArrowOpen", { fg = "#C5C5C5" })
+    hl("NvimTreeIndentMarker", { fg = "#404040" })
+    hl("NvimTreeSpecialFile", { fg = "#CCCCCC", underline = false })
+    hl("NvimTreeExecFile", { fg = "#CCCCCC" })
+    hl("NvimTreeGitDirtyIcon", { fg = "#E2C08D" })
+    hl("NvimTreeGitStagedIcon", { fg = "#73C991" })
+    hl("NvimTreeGitNewIcon", { fg = "#73C991" })
+    hl("NvimTreeGitDeletedIcon", { fg = "#C74E39" })
+    hl("NvimTreeGitIgnoredIcon", { fg = "#8C8C8C" })
+    hl("NvimTreeGitFileDirtyHL", { fg = "#E2C08D" })
+    hl("NvimTreeGitFileNewHL", { fg = "#73C991" })
+    hl("NvimTreeGitFileStagedHL", { fg = "#73C991" })
+    hl("NvimTreeGitFileDeletedHL", { fg = "#C74E39" })
+    hl("NvimTreeGitFileIgnoredHL", { fg = "#8C8C8C" })
+    hl("NvimTreeModifiedIcon", { fg = "#E2C08D" })
+
+    -- git signs
+    hl("MiniDiffSignAdd", { fg = "#587C0C" })
+    hl("MiniDiffSignChange", { fg = "#0C7D9D" })
+    hl("MiniDiffSignDelete", { fg = "#94151B" })
+
+    -- TODO / FIXME highlights
+    hl("MiniHipatternsFixme", { fg = "#1F1F1F", bg = c.red, bold = true })
+    hl("MiniHipatternsHack", { fg = "#1F1F1F", bg = c.yellow, bold = true })
+    hl("MiniHipatternsTodo", { fg = "#1F1F1F", bg = c.blue, bold = true })
+    hl("MiniHipatternsNote", { fg = "#1F1F1F", bg = c.green, bold = true })
 end
 
-apply_theme()
--- Re-apply if some plugin/colorscheme command resets the groups
+local function load_theme()
+    require("vscode").setup({
+        style = "dark",
+        transparent = transparent,
+        italic_comments = false,
+        italic_inlayhints = false,
+        underline_links = true,
+        terminal_colors = true,
+    })
+    vim.cmd.colorscheme("vscode")
+    -- see-through popups / floats / completion menu when transparent
+    vim.o.winblend = transparent and 12 or 0
+    vim.o.pumblend = transparent and 12 or 0
+    apply_extras()
+end
+
+load_theme()
+-- Re-apply extras if any colorscheme command resets groups
 vim.api.nvim_create_autocmd("ColorScheme", {
-    callback = function() vim.schedule(apply_theme) end,
+    group = augroup,
+    callback = function() vim.schedule(apply_extras) end,
 })
+
+map("n", "<leader>tT", function()
+    transparent = not transparent
+    load_theme()
+    vim.notify("Transparent background " .. (transparent and "ON" or "OFF"))
+end, { desc = "Toggle transparent background" })
